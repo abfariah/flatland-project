@@ -7,19 +7,27 @@ from tqdm import trange, tqdm
 
 def random_search(x, fitness, gens, std=0.01, r=5., rng=np.random.default_rng()):
     x_best = x
+    f_best = -np.Inf
     for g in trange(gens):
-        x_temp = np.random.uniform(-r, r, len(x_best))
-        if fitness(x_temp) > fitness(x_best):
-            x_best = x_temp
+        ind = np.random.uniform(-r, r, len(x_best))
+        f = fitness(ind)
+        if f > f_best:
+            f_best = f
+            x_best = ind
+        logging.info('\t%d\t%d', g, f_best)
     return x_best
 
 def random_optimization(x, fitness, gens, std=0.01, r=5., rng=np.random.default_rng()):
     x_best = x
+    f_best = -np.Inf
     for g in trange(gens):
         N = rng.normal(size=(len(x))) * std
-        x_temp = x + N[:]
-        if fitness(x_temp) > fitness(x_best):
-            x_best = x_temp
+        ind = x + N[:]
+        f = fitness(ind)
+        if f > f_best:
+            f_best = f
+            x_best = ind
+        logging.info('\t%d\t%d', g, f_best)
     return x_best
 
 def oneplus_lambda(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng()):
@@ -50,19 +58,21 @@ def oneplus_lambda(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng())
 
 
 def simulated_annealing_proba(f, f_best, t):
-    return np.exp(-(f - f_best) / t)
+    return np.exp(-(f_best - f) / t)
 
 def simulated_annealing_optimization(x, fitness, gens, std=0.01, rng=np.random.default_rng()):
     x_best = x
     f_best = -np.Inf
     n_evals = 0
     for k in trange(gens):
+        t = (gens - k) / gens
         N = rng.normal(size=(len(x))) * std
-        ind = x + N[:]
+        ind = x_best + N[:]
         f = fitness(ind)
-        if f > f_best or (rng.random() < simulated_annealing_proba(f, f_best, k)):
+        if f > f_best or (rng.random() < simulated_annealing_proba(f, f_best, t)):
             f_best = f
             x_best = ind
+
         n_evals += 1
         logging.info('\t%d\t%d', n_evals, f_best)
     return x_best
