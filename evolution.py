@@ -22,7 +22,7 @@ def random_optimization(x, fitness, gens, std=0.01, r=5., rng=np.random.default_
             x_best = x_temp
     return x_best
 
-def oneplus_lambda(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng()):
+def oneplus_lambda(x, fitness, gens, lam, std=0.5, rng=np.random.default_rng()):
     x_best = x
     f_best = -np.Inf
     n_evals = 0
@@ -37,6 +37,35 @@ def oneplus_lambda(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng())
         x = x_best
         n_evals += lam
         logging.info('\t%d\t%d', n_evals, f_best)
+    return x_best
+
+
+
+def mu_lambda(x, fitness, gens, lam, alpha=0.2, verbose=False):
+    x_best = x
+    f_best = -np.Inf
+    n_evals = 0
+    fits = np.zeros(gens)
+    for g in range(gens):
+        N = np.random.normal(size=(lam, len(x))) *2
+        F = np.zeros(lam)
+        for i in range(lam):
+            ind = x + N[i, :]
+            F[i] = fitness(ind)
+            print("F[" + str(i)+ "] =" + str(F[i]))
+            if F[i] > f_best:
+                f_best = F[i]
+                x_best = ind
+        fits[g] = f_best
+        mu_f = np.mean(F)
+        std_f = np.std(F)
+        A = F
+        if std_f != 0:
+            A = (F - mu_f) / std_f
+        x = x - alpha * np.dot(A, N) / lam
+        n_evals += lam
+        logging.info('\t%d\t%d', n_evals, f_best)
+        print("x0 = "+str(x[0]))
     return x_best
 
 #def mu_plus_rho_lambda():
@@ -66,6 +95,10 @@ def simulated_annealing_optimization(x, fitness, gens, std=0.01, rng=np.random.d
         n_evals += 1
         logging.info('\t%d\t%d', n_evals, f_best)
     return x_best
+
+
+
+
 
 #def truncation_selection(population, fitness, p=0.2):
 #    n_elites = int(np.floor(len(population) * p))
@@ -136,7 +169,7 @@ if __name__ == '__main__':
     parser.add_argument('--log', help='log file', default='evolution.log', type=str)
     parser.add_argument('--weights', help='filename to save policy weights', default='weights', type=str)
     args = parser.parse_args()
-    logging.basicConfig(filename=args.log, encoding='utf-8', level=logging.DEBUG,
+    logging.basicConfig(filename=args.log, level=logging.DEBUG,
                         format='%(asctime)s %(message)s')
 
     # starting point
@@ -160,6 +193,8 @@ if __name__ == '__main__':
         x_best = random_optimization(start, fit, args.gens, std=args.std, r=args.range, rng=np.random.default_rng())
     elif args.algorithm == "sao":
         x_best = simulated_annealing_optimization(start, fit, args.gens, std=args.std, rng=np.random.default_rng())
+    elif args.algorithm == "mu":
+        x_best =mu_lambda(start, fit, args.gens, args.pop)
     else:
         print(f"unkown algorithm '{args.algorithm}'. Aborting.")
         exit()
