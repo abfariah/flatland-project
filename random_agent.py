@@ -15,7 +15,9 @@ my_observation_builder = GlobalObsForRailEnv()
 episode = 0
 env = load_flatland_environment_from_file("small.pkl")
 
-for i in range(2):
+fitnesses = []
+
+for i in range(20):
 
     print("==============")
     episode += 1
@@ -31,10 +33,12 @@ for i in range(2):
         print("[INFO] DONE ALL, BREAKING")
         break
 
+    fitness = 0
     while True:
         action = my_controller(obs, env)
         try:
             obs, all_rewards, done, info = env.step(action)
+            fitness += sum(list(all_rewards.values()))
         except:
             print("[ERR] DONE BUT step() CALLED")
 
@@ -43,5 +47,8 @@ for i in range(2):
             print("[INFO] EPISODE_DONE : ", episode)
             print("[INFO] TOTAL_REW: ", sum(list(all_rewards.values())))
             break
+    fitnesses.append(fitness)
 
 print("Evaluation Complete...")
+print(fitnesses)
+print(np.mean(fitnesses), np.std(fitnesses))

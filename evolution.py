@@ -5,15 +5,15 @@ import numpy as np
 import logging
 from tqdm import trange, tqdm
 
-def random_search(x, fitness, gens, std=0.01, rng=np.random.default_rng()):
+def random_search(x, fitness, gens, std=0.01, r=5., rng=np.random.default_rng()):
     x_best = x
     for g in trange(gens):
-        x_temp = np.random.uniform(-5, 5, len(x_best))
+        x_temp = np.random.uniform(-r, r, len(x_best))
         if fitness(x_temp) > fitness(x_best):
             x_best = x_temp
     return x_best
 
-def random_optimization(x, fitness, gens, std=0.01, rng=np.random.default_rng()):
+def random_optimization(x, fitness, gens, std=0.01, r=5., rng=np.random.default_rng()):
     x_best = x
     for g in trange(gens):
         N = rng.normal(size=(len(x))) * std
@@ -130,6 +130,8 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gens', help='number of generations', default=100, type=int)
     parser.add_argument('-p', '--pop', help='population size (lambda for the 1+lambda ES)', default=10, type=int)
     parser.add_argument('-s', '--seed', help='seed for evolution', default=0, type=int)
+    parser.add_argument('-S', '--std', help='the standard deviation of the search', default=0.01, type=float)
+    parser.add_argument('-r', '--range', help='the range of the search', default=5., type=float)
     parser.add_argument('-a', '--algorithm', help='the algorithm', default="opl", type=str)
     parser.add_argument('--log', help='log file', default='evolution.log', type=str)
     parser.add_argument('--weights', help='filename to save policy weights', default='weights', type=str)
@@ -149,14 +151,15 @@ if __name__ == '__main__':
     def fit(x):
         return fitness(x, s, a, env, params)
 
+    print(args)
     if args.algorithm == "opl":
         x_best = oneplus_lambda(start, fit, args.gens, args.pop, rng=rng)
     elif args.algorithm == "rs":
-        x_best = random_search(start, fit, args.gens, std=0.01, rng=np.random.default_rng())
+        x_best = random_search(start, fit, args.gens, std=args.std, r=args.range, rng=np.random.default_rng())
     elif args.algorithm == "ro":
-        x_best = random_optimization(start, fit, args.gens, std=0.01, rng=np.random.default_rng())
+        x_best = random_optimization(start, fit, args.gens, std=args.std, r=args.range, rng=np.random.default_rng())
     elif args.algorithm == "sao":
-        x_best = simulated_annealing_optimization(start, fit, args.gens, std=0.01, rng=np.random.default_rng())
+        x_best = simulated_annealing_optimization(start, fit, args.gens, std=args.std, rng=np.random.default_rng())
     else:
         print(f"unkown algorithm '{args.algorithm}'. Aborting.")
         exit()
