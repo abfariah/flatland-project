@@ -5,19 +5,28 @@ import numpy as np
 import logging
 from tqdm import trange, tqdm
 
-#
-#def random_optimization(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng()):
-#    while not terminate
-#        xp = x + N(0, 1)
-#        if f(xp) < f(x)
-#            x = xp
-#    return x
+def random_search(x, fitness, gens, std=0.01, rng=np.random.default_rng()):
+    x_best = x
+    for g in trange(gens):
+        x_temp = np.random.uniform(-5, 5, len(x_best))
+        if fitness(x_temp) > fitness(x_best):
+            x_best = x_temp
+    return x_best
+
+def random_optimization(x, fitness, gens, std=0.01, rng=np.random.default_rng()):
+    x_best = x
+    for g in trange(gens):
+        N = rng.normal(size=(len(x))) * std
+        x_temp = x + N[:]
+        if fitness(x_temp) > fitness(x_best):
+            x_best = x_temp
+    return x_best
 
 def oneplus_lambda(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng()):
     x_best = x
     f_best = -np.Inf
     n_evals = 0
-    for g in range(gens):
+    for g in trange(gens):
         N = rng.normal(size=(lam, len(x))) * std
         for i in range(lam):
             ind = x + N[i, :]
@@ -142,6 +151,10 @@ if __name__ == '__main__':
 
     if args.algorithm == "opl":
         x_best = oneplus_lambda(start, fit, args.gens, args.pop, rng=rng)
+    elif args.algorithm == "rs":
+        x_best = random_search(start, fit, args.gens, std=0.01, rng=np.random.default_rng())
+    elif args.algorithm == "ro":
+        x_best = random_optimization(start, fit, args.gens, std=0.01, rng=np.random.default_rng())
     elif args.algorithm == "sao":
         x_best = simulated_annealing_optimization(start, fit, args.gens, std=0.01, rng=np.random.default_rng())
     else:
