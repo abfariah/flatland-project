@@ -3,6 +3,10 @@ from policy import NeuroevoPolicy
 from argparse import ArgumentParser
 import numpy as np
 import logging
+from pymoo.operators.crossover import erx
+from pymoo.factory import get_crossover
+
+erc = get_crossover("perm_erx")
 
 def oneplus_lambda(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng()):
     x_best = x
@@ -21,103 +25,78 @@ def oneplus_lambda(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng())
         logging.info('\t%d\t%d', n_evals, f_best)
     return x_best
 
-def random_optimization(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng()):
-    Initialize x randomly in ℝ
-    while not terminate
-        x' = x + N(0, 1)
-        if f(x′) < f(x)
-            x = x'
-    return x
 
-def simulated_annealing():
-    Initialize x randomly in ℝ
-    xbest = x
-    for k in {0, kmax}
-        x' = nearby(x)
-        if f(x′) < f(x)
-            x = x'
-        else
-            x = x' with probability P(f(x'), f(x), T)
-        if f(x) < f(xbest)
-            xbest = x
-    return xbest
-
-def simulated_annealing_optimization():
-    Initialize x randomly in ℝ
-    for k in {0, kmax}
-    xbest = x
-        xp = x + N(0, 1)
-        T = (kmax - k) / kmax
-        if (f(xp) < f(x)) or (exp(-(f(xp)-f(x))/T) > rand())
-            x = xp
-            if f(x) < f(xbest)
-                xbest = x
-    return xbest
-
-def mu_plus_rho_lambda():
-    Initialize x randomly in ℝ
-    while not terminate
-        for i in [1,λ]
-            N_i = 𝑁(0, 1)
-            F_i = f(x + N_i)
-        A = (F−𝜇(F))/𝜎(F)
-        x = x - 𝛼(A⋅N)/𝜆
-
-def evaluate(population, distances):
-    fitness = np.zeros(len(population))
+def evaluate_pop(population, fit):
+    fitness_population = np.zeros(len(population))
     for i in range(len(population)):
-        fitness[i] = total_distance(population[i], distances)
-    return fitness
+        fitness_population[i] = fit(population[i])
+    return fitness_population
 
-def truncation_selection(population, fitness, p=0.2):
-    n_elites = int(np.floor(len(population) * p))
-    elites = np.argsort(fitness)[:n_elites]
-    return population[elites], fitness[elites]
 
-def fp_selection(population, fitness):
-    p = (np.max(fitness) - fitness)
+def fp_selection(population, fitness_population):
+    p = (np.min(fitness_population) - fitness_population)
+    if len(np.unique(p)) == 1:
+        p = np.ones(len(population))
     p /= np.sum(p)
     rng = np.random.default_rng()
-    ind = rng.choice(len(population), p=p)
-    return population[ind], fitness[ind]
+    ind = rng.choice(len(population), p=p, size=int(len(population)*0.4))
+    return population[ind], fitness_population[ind]
 
-def tournament_selection(population, fitness, t_size=3):
+
+def truncation_selection(population, fitness_population, p=0.2):
+    n_elites = int(np.floor(len(population) * p))
+    elites = np.argsort(fitness_population)[-n_elites:]
+    return population[elites], fitness_population[elites]
+
+
+def tournament_selection(population, fitness_population, t_size=2):
     inds = rng.choice(len(population), t_size)
-    ind = inds[np.argmin(fitness[inds])]
-    return population[ind], fitness[ind]
+    ind = inds[np.argmax(fitness_population[inds])]
+    return population[ind], fitness_population[ind]
 
-def one_point(p1, p2):
-    rng = np.random.default_rng()
-    x = rng.choice(np.arange(1, np.minimum(len(p1)-1, len(p2)-1)))
-    return np.concatenate((p1[:x], p2[x:])), np.concatenate((p2[:x],p1[x:]))
 
 def mutate(ind):
     ind = np.copy(ind)
-    rng = np.random.default_rng()
     i, j = rng.choice(len(ind), size=2, replace=False)
     ind[i], ind[j] = ind[j], ind[i]
     return ind
 
-def ga_step(population):
-    fitness = evaluate(population, d)
-    next_pop, _ = truncation_selection(population, fitness)
+
+def ga_step(population, fit):
+    #print("DOING A STEP")
+    #print("popu to evaluate and generate next", population.shape)
+    fitness_population = evaluate_pop(population, fit)
+    next_pop, _ = fp_selection(population, fitness_population)
+    #print("HERE !", next_pop.shape)
     while len(next_pop) < len(population):
-        parent1, _ = tournament_selection(population, fitness)
-        parent2, _ = tournament_selection(population, fitness)
+        parent1, _ = tournament_selection(population, fitness_population)
+        parent2, _ = tournament_selection(population, fitness_population)
         child = erx.erx(parent1, parent2)
+        # child = parent1 + rng.normal(scale=2.5, size=(len(parent1)))
         child = mutate(child)
         next_pop = np.concatenate((next_pop, [child]))
-    return next_pop, fitness
+    return next_pop, fitness_population
 
-def ga(n_population=100, n_gen=100, verbose=False):
-    population = np.array([rng.permutation(n_cities) for i in range(n_population)])
-    minfit = np.zeros(n_gen)
-    t = trange(n_gen)
-    for i in t:
-        population, fitness = ga_step(population)
-        minfit[i] = np.min(fitness)
-        if i > 2 and minfit[i] < minfit[i-1]:
-            t.set_description(f"{i: 03d}, {minfit[i]: 5.3f}")
+
+def ga(x, fit, n_gens=100):
+    current_population = x
+    fitness_population = evaluate_pop(x, fit)
+    best_fitness = np.max(fitness_population)
+    x_best = x[np.argmax(fitness_population)]
+    for g in range(n_gens):
+        print(f"GENERATION {g+1}/{n_gens}")
+        new_population, fitness_population = ga_step(current_population, fit)
+        max_for_this_generation = np.max(fitness_population)
+        if max_for_this_generation > best_fitness:
+            best_fitness = max_for_this_generation
+            x_best = current_population[np.argmax(fitness_population)]
+            print("best fit : ", fit(x_best))
+        current_population = new_population
+        logging.info('\t%d\t%d', len(x)*g, best_fitness)
+        if best_fitness == 0.0:
+            print("BEST FITNESS POSSIBLE ACHIEVED")
+            break
+    return x_best
 
 
 def fitness(x, s, a, env, params):
@@ -135,7 +114,7 @@ if __name__ == '__main__':
     parser.add_argument('--log', help='log file', default='evolution.log', type=str)
     parser.add_argument('--weights', help='filename to save policy weights', default='weights', type=str)
     args = parser.parse_args()
-    logging.basicConfig(filename=args.log, encoding='utf-8', level=logging.DEBUG,
+    logging.basicConfig(filename=args.log, level=logging.DEBUG,
                         format='%(asctime)s %(message)s')
 
     # starting point
@@ -145,11 +124,11 @@ if __name__ == '__main__':
 
     # evolution
     rng = np.random.default_rng(args.seed)
-    start = rng.normal(size=(len(policy.get_params(),)))
+    start = rng.normal(size=(args.pop, len(policy.get_params(),)))
 
     def fit(x):
         return fitness(x, s, a, env, params)
-    x_best = oneplus_lambda(start, fit, args.gens, args.pop, rng=rng)
+    x_best = ga(start, fit, args.gens)
 
     # Evaluation
     policy.set_params(x_best)
