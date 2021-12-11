@@ -1,0 +1,6 @@
+We first implemented the algorithms of class, giving deceptive results.
+The random search baseline gives a mean result of -699 over 20 runs.
+We then implemented a classic genetic algorithm using pymoo.
+The network was changed to have respectively 28 and 16 neurons on its two hidden layers.
+We used tournament selection with p=0.2 and a 10-individual population over 100 generations.
+Final results are stored in evolution.log and our policy performs a mean of -395.65 over 20 episodes on *large* ^^.
