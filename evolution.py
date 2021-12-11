@@ -13,6 +13,99 @@ from evaluate import get_env, get_state_action_size, evaluate
 from policy import NeuroevoPolicy
 
 
+def random_search(x, fitness, gens, std=0.01, r=5., rng=np.random.default_rng()):
+    x_best = x
+    f_best = -np.Inf
+    for g in trange(gens):
+        ind = np.random.uniform(-r, r, len(x_best))
+        f = fitness(ind)
+        if f > f_best:
+            f_best = f
+            x_best = ind
+        logging.info('\t%d\t%d', g, f_best)
+    return x_best
+
+def random_optimization(x, fitness, gens, std=0.01, r=5., rng=np.random.default_rng()):
+    x_best = x
+    f_best = -np.Inf
+    for g in trange(gens):
+        N = rng.normal(size=(len(x))) * std
+        ind = x + N[:]
+        f = fitness(ind)
+        if f > f_best:
+            f_best = f
+            x_best = ind
+        logging.info('\t%d\t%d', g, f_best)
+    return x_best
+
+def oneplus_lambda(x, fitness, gens, lam, std=0.5, rng=np.random.default_rng()):
+    x_best = x
+    f_best = -np.Inf
+    n_evals = 0
+    for g in trange(gens):
+        N = rng.normal(size=(lam, len(x))) * std
+        for i in range(lam):
+            ind = x + N[i, :]
+            f = fitness(ind)
+            if f > f_best:
+                f_best = f
+                x_best = ind
+        x = x_best
+        n_evals += lam
+        logging.info('\t%d\t%d', n_evals, f_best)
+    return x_best
+
+
+def mu_lambda(x, fitness, gens, lam, alpha=0.2, verbose=False):
+    x_best = x
+    f_best = -np.Inf
+    n_evals = 0
+    fits = np.zeros(gens)
+    for g in range(gens):
+        N = np.random.normal(size=(lam, len(x))) *2
+        F = np.zeros(lam)
+        for i in range(lam):
+            ind = x + N[i, :]
+            F[i] = fitness(ind)
+            print("F[" + str(i)+ "] =" + str(F[i]))
+            if F[i] > f_best:
+                f_best = F[i]
+                x_best = ind
+        fits[g] = f_best
+        mu_f = np.mean(F)
+        std_f = np.std(F)
+        A = F
+        if std_f != 0:
+            A = (F - mu_f) / std_f
+        x = x - alpha * np.dot(A, N) / lam
+        n_evals += lam
+        logging.info('\t%d\t%d', n_evals, f_best)
+        print("x0 = "+str(x[0]))
+    return x_best
+
+
+def simulated_annealing_proba(f, f_best, t):
+    return np.exp(-(f_best - f) / t)
+
+
+def simulated_annealing_optimization(x, fitness, gens, std=0.01, rng=np.random.default_rng()):
+    x_best = x
+    f_best = -np.Inf
+    n_evals = 0
+    for k in trange(gens):
+        t = (gens - k) / gens
+        N = rng.normal(size=(len(x))) * std
+        ind = x_best + N[:]
+        f = fitness(ind)
+        if f > f_best or (rng.random() < simulated_annealing_proba(f, f_best, t)):
+            f_best = f
+            x_best = ind
+
+        n_evals += 1
+        logging.info('\t%d\t%d', n_evals, f_best)
+    return x_best
+
+
 erc = get_crossover("perm_erx")
 
 
@@ -98,6 +191,9 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gens', help='number of generations', default=100, type=int)
     parser.add_argument('-p', '--pop', help='population size (lambda for the 1+lambda ES)', default=10, type=int)
     parser.add_argument('-s', '--seed', help='seed for evolution', default=0, type=int)
+    parser.add_argument('-S', '--std', help='the standard deviation of the search', default=0.01, type=float)
+    parser.add_argument('-r', '--range', help='the range of the search', default=5., type=float)
+    parser.add_argument('-a', '--algorithm', help='the algorithm', default="opl", type=str)
     parser.add_argument('--log', help='log file', default='evolution.log', type=str)
     parser.add_argument('--weights', help='filename to save policy weights', default='weights', type=str)
     args = parser.parse_args()
@@ -115,7 +211,23 @@ if __name__ == '__main__':
 
     def fit(x):
         return fitness(x, s, a, env, params)
-    x_best = ga(start, fit, args.gens)
+
+    print(args)
+    if args.algorithm == "opl":
+        x_best = oneplus_lambda(start, fit, args.gens, args.pop, rng=rng)
+    elif args.algorithm == "rs":
+        x_best = random_search(start, fit, args.gens, std=args.std, r=args.range, rng=np.random.default_rng())
+    elif args.algorithm == "ro":
+        x_best = random_optimization(start, fit, args.gens, std=args.std, r=args.range, rng=np.random.default_rng())
+    elif args.algorithm == "sao":
+        x_best = simulated_annealing_optimization(start, fit, args.gens, std=args.std, rng=np.random.default_rng())
+    elif args.algorithm == "mu":
+        x_best =mu_lambda(start, fit, args.gens, args.pop)
+    elif args.algorithm == "ga":
+        x_best = ga(start, fit, args.gens)
+    else:
+        print(f"unkown algorithm '{args.algorithm}'. Aborting.")
+        exit()
 
     # Evaluation
     policy.set_params(x_best)

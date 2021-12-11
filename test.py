@@ -6,6 +6,7 @@ import logging
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-e', '--env', help='environment', default='small', type=str)
+    parser.add_argument('-n', '--nb_runs', help='number of runs', default=3, type=int)
     parser.add_argument('--render', help='display the environment', default=False, type=bool)
     parser.add_argument('--weights', help='filename to load policy weights', default='weights', type=str)
     args = parser.parse_args()
@@ -18,10 +19,10 @@ if __name__ == '__main__':
     print('Weights: ', policy.get_params()[:5])
 
     mean_fit = 0
-    for i in range(3):
+    for i in range(args.nb_runs):
         params["seed"] = i
         fit = evaluate(env, params, policy, render=args.render)
         mean_fit += fit
         print('Fitness: ', fit)
-    mean_fit /= 3.0
+    mean_fit /= args.nb_runs
     print('Mean fit: ', mean_fit)
