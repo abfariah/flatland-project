@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 class PolicyNetwork(nn.Module):
 
-    def __init__(self, state_size, action_size, hidsize1=128, hidsize2=128):
+    def __init__(self, state_size, action_size, hidsize1=28, hidsize2=16):
         super(PolicyNetwork, self).__init__()
 
         self.fc1 = nn.Linear(state_size, hidsize1)
@@ -35,15 +35,13 @@ class NeuroevoPolicy:
         self.hidsize = 56
         self.device = torch.device("cpu")
         self.model = PolicyNetwork(state_size, action_size,
-                                   hidsize1=56, hidsize2=28).to(self.device)
+                                   hidsize1=28, hidsize2=16).to(self.device)
         self.model = self.model.to(self.device).double()
 
     def act(self, state):
         state = torch.from_numpy(state).double().unsqueeze(0).to(self.device)
         self.model.eval()
         with torch.no_grad():
-            # outputs = torch.stack([self.model(state) for sample in range(50)]).squeeze()
-            # action_values = outputs.mean(axis=0)
             action_values = self.model(state)
         return np.argmax(action_values.cpu().data.numpy())
 

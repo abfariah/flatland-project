@@ -1,32 +1,22 @@
-from evaluate import get_env, get_state_action_size, evaluate
-from policy import NeuroevoPolicy
+# Standard libraries
 from argparse import ArgumentParser
-import numpy as np
 import logging
+from typing import Callable
+
+# Third-party libraries
+import numpy as np
 from pymoo.operators.crossover import erx
 from pymoo.factory import get_crossover
 
+# Local dependencies
+from evaluate import get_env, get_state_action_size, evaluate
+from policy import NeuroevoPolicy
+
+
 erc = get_crossover("perm_erx")
 
-def oneplus_lambda(x, fitness, gens, lam, std=0.01, rng=np.random.default_rng()):
-    x_best = x
-    f_best = -np.Inf
-    n_evals = 0
-    for g in range(gens):
-        N = rng.normal(size=(lam, len(x))) * std
-        for i in range(lam):
-            ind = x + N[i, :]
-            f = fitness(ind)
-            if f > f_best:
-                f_best = f
-                x_best = ind
-        x = x_best
-        n_evals += lam
-        logging.info('\t%d\t%d', n_evals, f_best)
-    return x_best
 
-
-def evaluate_pop(population, fit):
+def evaluate_pop(population: np.ndarray, fit: Callable) -> np.ndarray:
     fitness_population = np.zeros(len(population))
     for i in range(len(population)):
         fitness_population[i] = fit(population[i])
@@ -59,26 +49,23 @@ def mutate(ind):
     ind = np.copy(ind)
     i, j = rng.choice(len(ind), size=2, replace=False)
     ind[i], ind[j] = ind[j], ind[i]
+    
     return ind
 
 
 def ga_step(population, fit):
-    #print("DOING A STEP")
-    #print("popu to evaluate and generate next", population.shape)
     fitness_population = evaluate_pop(population, fit)
     next_pop, _ = fp_selection(population, fitness_population)
-    #print("HERE !", next_pop.shape)
     while len(next_pop) < len(population):
         parent1, _ = tournament_selection(population, fitness_population)
         parent2, _ = tournament_selection(population, fitness_population)
         child = erx.erx(parent1, parent2)
-        # child = parent1 + rng.normal(scale=2.5, size=(len(parent1)))
         child = mutate(child)
         next_pop = np.concatenate((next_pop, [child]))
     return next_pop, fitness_population
 
 
-def ga(x, fit, n_gens=100):
+def ga(x: np.ndarray, fit: Callable, n_gens: int = 100) -> np.ndarray:
     current_population = x
     fitness_population = evaluate_pop(x, fit)
     best_fitness = np.max(fitness_population)
@@ -90,7 +77,7 @@ def ga(x, fit, n_gens=100):
         if max_for_this_generation > best_fitness:
             best_fitness = max_for_this_generation
             x_best = current_population[np.argmax(fitness_population)]
-            print("best fit : ", fit(x_best))
+            print("Best Fit updated : ", fit(x_best))
         current_population = new_population
         logging.info('\t%d\t%d', len(x)*g, best_fitness)
         if best_fitness == 0.0:
